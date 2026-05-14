@@ -84,6 +84,41 @@ jobs:
       - name: Push image
         if: success()
         run: docker push ${{ secrets.USERNAME}}/${{env.DH_IMAGE}}:${{env.TAG}}
+
+      - name: deploy to server
+        if: success()
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            
+            docker pull ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+
+            docker stop react-app || true
+
+            docker rm react-app || true
+
+            docker run -d \
+              --name react-app \
+              --p 3006:80 \
+              ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+          "
+      - name: Send Deploy Success Message
+        if: success()
+        run: |
+
+          MESSAGE="✅ *Deployment Successful*
+
+          *Project:* ${{ env.DH_IMAGE }}
+          *Image:* ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+
+          🚀 App has been deployed successfully to server.
+
+          _Triggered from GitHub Actions_"
+
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE"
+
       - name: Always logout
         if: always()
         run: docker logout
