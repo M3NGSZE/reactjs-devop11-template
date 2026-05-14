@@ -11,7 +11,7 @@ jobs:
     environment: DH_ENV
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Version using Git SHA
         run: |
           echo "TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
@@ -88,18 +88,26 @@ jobs:
       - name: deploy to server
         if: success()
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-            
-            docker pull ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+          mkdir -p ~/.ssh
 
-            docker stop react-app || true
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-            docker rm react-app || true
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-            docker run -d \
-              --name react-app \
-              --p 3006:80 \
-              ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+          ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+
+              docker pull ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
+
+              docker stop react-app || true
+
+              docker rm react-app || true
+
+              docker run -d \
+                --name react-app \
+                -p 3006:80 \
+                ${{ secrets.USERNAME }}/${{ env.DH_IMAGE }}:${{ env.TAG }}
           "
       - name: Send Deploy Success Message
         if: success()
